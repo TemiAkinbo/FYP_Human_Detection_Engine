@@ -1,0 +1,1 @@
+python3 ncs_detector_and_tracker.py -g graph/mobilnetgraph -m live
