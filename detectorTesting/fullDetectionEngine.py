@@ -6,14 +6,15 @@ import cv2
 import argparse
 import pickle
 from imutils.object_detection import non_max_suppression as nms
-import matplotlib.pyplot as plt
+import csv
+import datetime
 
 
 def dnnDetection(frame):
 
     rects = []
-    prototxt = "mobilenet_ssd/MobileNetSSD_deploy.prototxt"
-    caffeModel = "mobilenet_ssd/MobileNetSSD_deploy.caffemodel"
+    prototxt = "../model/MobileNetSSD_deploy.prototxt"
+    caffeModel = "../model/MobileNetSSD_deploy.caffemodel"
     CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
                "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
                "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
@@ -89,9 +90,9 @@ if __name__ == '__main__':
 
     ap = argparse.ArgumentParser()
     ap.add_argument("-af", "--annotationsFile", required=False,
-                    default="detectorTesting/videoframe_annotations.pickle")
+                    default="annotations/videoframe_annotations.pickle")
     ap.add_argument("-v", "--video", required=False,
-                    default="testVideo/IMG_0330.MOV")
+                    default="../testVideo/IMG_0330.MOV")
     ap.add_argument("-d", "--detection", required=False,
                     default="dNN")
     ap.add_argument("-V", "--verbose", type=bool, required=False,
@@ -118,6 +119,9 @@ if __name__ == '__main__':
 
     # list of objects being tracked
     trackers = []
+
+    # reporting
+    report = []
 
     # load annotations into list
     with open(args["annotationsFile"], 'rb') as annotations_list_file:
@@ -251,6 +255,7 @@ if __name__ == '__main__':
             print("IoU's : {}".format(IoU))
             print("Avg IoU: {}".format(iouAvg))
 
+
         IoUTotalAvg += iouAvg
         totalFalseNegatives += falseNegatives
         totalFalsePositives += falsePositives
@@ -258,7 +263,8 @@ if __name__ == '__main__':
         totalAccuracy += truePositives / len(gtbbox)
 
         if truePositives != 0 or falsePositives != 0:
-            precision.append(truePositives / (truePositives + falsePositives))
+            prec = truePositives/(truePositives + falsePositives)
+            precision.append(prec)
         else:
             precision.append(0)
 
@@ -266,6 +272,17 @@ if __name__ == '__main__':
             recall.append(truePositives / (truePositives + falseNegatives))
         else:
             recall.append(0)
+
+        reportingDict = {
+            "Frame": anno,
+            "True Positives": truePositives,
+            "False Negatives": falseNegatives,
+            "False Positives": falsePositives,
+            "Avg IoU": iouAvg,
+            "Precision": prec
+        }
+
+        report.append(reportingDict)
 
         cv2.imshow("Image", frame)
         key = cv2.waitKey(1) & 0xFF
@@ -297,10 +314,17 @@ if __name__ == '__main__':
     performanceDrop = ((videoFPS - fps.fps()) / videoFPS) * 100
 
     print("FPS performance drop: {:.2f} %".format(performanceDrop))
-    # print("Precision: {}".format(precision))
-    # print("Recall: {}".format(recall))
 
-    plt.plot(recall, precision, 'bo')
-    plt.xlabel('recall')
-    plt.ylabel('precision')
-    plt.show()
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M")
+    filename = "EvalReports/full_detection_system_report_{}_.csv".format(now)
+
+    with open(filename, mode='w') as csv_file:
+        fieldnames = ['Frame', 'True Positives', 'False Negatives', 'False Positives', 'Avg IoU', 'Precision']
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        csv_writer = csv.writer(csv_file, delimiter=',')
+
+        writer.writeheader()
+        for line in report:
+            writer.writerow(line)
+
+
